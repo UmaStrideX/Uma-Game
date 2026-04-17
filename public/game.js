@@ -117,7 +117,7 @@ class SceneMenu extends Phaser.Scene {
         let currentIndex = 0;
         const nameDisplay = document.getElementById('uma-name');
         const previewSprite = this.add.sprite(this.scale.width / 2, this.scale.height / 2, `${UMA_LIST[currentIndex]}_idle_img`);
-        previewSprite.setScale(4);
+        previewSprite.setScale(1.4);
         const updateDisplay = () => {
             const name = UMA_LIST[currentIndex];
             nameDisplay.innerText = name.replace(/_/g, ' ');
