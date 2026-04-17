@@ -9,7 +9,56 @@ const UMA_LIST = [
 
 class ScenePreload extends Phaser.Scene {
     constructor() { super({ key: 'ScenePreload' }); }
+
     preload() {
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+
+        const progressBar = this.add.graphics();
+        const progressBox = this.add.graphics();
+        progressBox.fillStyle(0x002222, 0.8);
+        progressBox.fillRect(width / 2 - 160, height / 2 - 25, 320, 50);
+
+        const loadingText = this.make.text({
+            x: width / 2,
+            y: height / 2 - 50,
+            text: 'CHARGEMENT...',
+            style: { font: '14px monospace', fill: '#00ffcc' }
+        }).setOrigin(0.5, 0.5);
+
+        const percentText = this.make.text({
+            x: width / 2,
+            y: height / 2,
+            text: '0%',
+            style: { font: '18px monospace', fill: '#ffffff' }
+        }).setOrigin(0.5, 0.5);
+
+        const assetText = this.make.text({
+            x: width / 2,
+            y: height / 2 + 50,
+            text: '',
+            style: { font: '12px monospace', fill: '#00ffcc' }
+        }).setOrigin(0.5, 0.5);
+
+        this.load.on('progress', (value) => {
+            percentText.setText(parseInt(value * 100) + '%');
+            progressBar.clear();
+            progressBar.fillStyle(0x00ffcc, 1);
+            progressBar.fillRect(width / 2 - 150, height / 2 - 15, 300 * value, 30);
+        });
+
+        this.load.on('fileprogress', (file) => {
+            assetText.setText('Chargement : ' + file.key);
+        });
+
+        this.load.on('complete', () => {
+            progressBar.destroy();
+            progressBox.destroy();
+            loadingText.destroy();
+            percentText.destroy();
+            assetText.destroy();
+        });
+
         UMA_LIST.forEach(name => {
             this.load.path = `assets/${name}/`;
             this.load.image(`${name}_idle_img`, `${name}_idle.png`);
@@ -18,6 +67,7 @@ class ScenePreload extends Phaser.Scene {
             this.load.json(`${name}_run_data`, `${name}_run.json`);
         });
     }
+
     create() {
         const tileW = 128, tileH = 64;
         const drawTile = (key, color) => {
@@ -63,10 +113,11 @@ class ScenePreload extends Phaser.Scene {
 class SceneMenu extends Phaser.Scene {
     constructor() { super({ key: 'SceneMenu' }); }
     create() {
+        document.getElementById('ui-overlay').classList.add('visible');
         let currentIndex = 0;
         const nameDisplay = document.getElementById('uma-name');
         const previewSprite = this.add.sprite(this.scale.width / 2, this.scale.height / 2, `${UMA_LIST[currentIndex]}_idle_img`);
-        previewSprite.setScale(1.5);
+        previewSprite.setScale(4);
         const updateDisplay = () => {
             const name = UMA_LIST[currentIndex];
             nameDisplay.innerText = name.replace(/_/g, ' ');
@@ -77,6 +128,7 @@ class SceneMenu extends Phaser.Scene {
         document.getElementById('prev-btn').onclick = () => { currentIndex = (currentIndex - 1 + UMA_LIST.length) % UMA_LIST.length; updateDisplay(); };
         document.getElementById('confirm-btn').onclick = () => {
             const nick = document.getElementById('nickname-input').value || "UMA-UNIT";
+            document.getElementById('ui-overlay').classList.remove('visible');
             document.getElementById('ui-overlay').classList.add('hidden');
             previewSprite.destroy();
             this.scene.start('SceneMain', { char: UMA_LIST[currentIndex], nickname: nick });

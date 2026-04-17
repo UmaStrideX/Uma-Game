@@ -3,13 +3,14 @@ body { margin: 0; padding: 0; background-color: #000; font-family: 'Segoe UI', s
 
 #ui-overlay {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    display: flex; flex-direction: column; justify-content: space-between;
+    display: none; flex-direction: column; justify-content: space-between;
     padding: 60px 0; box-sizing: border-box;
     background: radial-gradient(circle, rgba(0,255,204,0.1) 0%, rgba(0,0,0,0.9) 100%);
     z-index: 10; color: white;
     transition: opacity 0.5s ease;
 }
 
+#ui-overlay.visible { display: flex; }
 #ui-overlay.hidden { opacity: 0; pointer-events: none; }
 
 .ui-top { text-align: center; animation: slideDown 0.8s ease-out; }
@@ -52,9 +53,7 @@ h1 { font-size: 1.6rem; letter-spacing: 10px; color: #00ffcc; margin: 0; text-sh
     backdrop-filter: blur(4px); resize: both; overflow: hidden;
 }
 
-#chat-display { 
-    flex-grow: 1; padding: 10px; overflow-y: auto; color: white; font-size: 13px; cursor: grab;
-}
+#chat-display { flex-grow: 1; padding: 10px; overflow-y: auto; color: white; font-size: 13px; cursor: grab; }
 #chat-display:active { cursor: grabbing; }
 
 .chat-msg { margin-bottom: 4px; background: rgba(0, 255, 204, 0.05); padding: 4px 8px; }
