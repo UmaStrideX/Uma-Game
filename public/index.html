@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UmaGame</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="game-container"></div>
+
+    <div id="ui-overlay">
+        <div class="ui-top">
+            <h1>UMA GAME</h1>
+            <div class="line"></div>
+            <input type="text" id="nickname-input" placeholder="Entrez votre nom..." maxlength="12">
+        </div>
+
+        <div class="ui-center">
+            <div class="focus-brackets"></div>
+        </div>
+
+        <div class="ui-bottom">
+            <div id="uma-name">SÉLECTION</div>
+            <div class="controls-wrapper">
+                <button id="prev-btn" class="nav-btn">PRÉCÉDENT</button>
+                <button id="confirm-btn">CONFIRMER</button>
+                <button id="next-btn" class="nav-btn">SUIVANT</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-wrapper">
+        <div id="chat-display"></div>
+        <input type="text" id="chat-input" placeholder="Appuyez sur Entrée pour parler...">
+    </div>
+
+    <div id="esc-menu" class="hidden">
+        <div class="menu-content">
+            <div class="menu-header">
+                <div class="glow-line"></div>
+                <h2>PAUSE</h2>
+                <div class="glow-line"></div>
+            </div>
+            
+            <div class="menu-options">
+                <button id="resume-btn" class="menu-btn">REPRENDRE</button>
+                <button id="exit-btn" class="menu-btn danger">DÉCONNEXION</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
