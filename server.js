@@ -1,26 +1,29 @@
 const express = require('express');
-const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const http = require('http');
+const { Server } = require('socket.io');
 const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const players = {};
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+let players = {};
 
 io.on('connection', (socket) => {
-    console.log('Un utilisateur s\'est connecté : ' + socket.id);
-
     socket.on('joinGame', (data) => {
         players[socket.id] = {
             id: socket.id,
-            nickname: data.nickname || "Uma",
-            char: data.char || "Special_Week",
             x: 0,
-            y: 1600, 
-            anim: data.char + "_idle_down"
+            y: 0,
+            char: data.char,
+            nickname: data.nickname
         };
-
         socket.emit('currentPlayers', players);
         socket.broadcast.emit('newPlayer', players[socket.id]);
     });
@@ -34,19 +37,17 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('chatMessage', (text) => {
+    socket.on('chatMessage', (msg) => {
         if (players[socket.id]) {
-            const messageData = {
+            io.emit('newChatMessage', {
                 id: socket.id,
                 name: players[socket.id].nickname,
-                text: text
-            };
-            io.emit('newChatMessage', messageData);
+                text: msg
+            });
         }
     });
 
     socket.on('disconnect', () => {
-        console.log('Utilisateur déconnecté : ' + socket.id);
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);
     });
@@ -54,5 +55,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Serveur démarré sur le port ${PORT}`);
+    console.log(`Serveur actif sur le port ${PORT}`);
 });
