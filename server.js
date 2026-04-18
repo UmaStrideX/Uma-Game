@@ -129,6 +129,13 @@ let players = {};
 
 io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
+        Object.keys(players).forEach((id) => {
+            if (players[id].nickname === data.nickname) {
+                delete players[id];
+                io.emit('playerDisconnected', id);
+            }
+        });
+
         players[socket.id] = {
             id: socket.id,
             x: 0,
