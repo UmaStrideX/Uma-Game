@@ -13,16 +13,20 @@ const io = new Server(server, {
     pingInterval: 10000
 });
 
-const TWITCH_CLIENT_ID = '52swwi6jn9nth7ubkekb4mo7x8y6yr';
-const TWITCH_CLIENT_SECRET = 'zfpafa835uycupk5reye65ses6u7m1';
-const CALLBACK_URL = 'http://localhost:3000/auth/twitch/callback';
+const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID || '52swwi6jn9nth7ubkekb4mo7x8y6yr';
+const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET || 'zfpafa835uycupk5reye65ses6u7m1';
+const CALLBACK_URL = process.env.RENDER_EXTERNAL_URL 
+    ? `${process.env.RENDER_EXTERNAL_URL}/auth/twitch/callback` 
+    : 'http://localhost:3000/auth/twitch/callback';
 
 passport.use(new TwitchStrategy({
     clientID: TWITCH_CLIENT_ID,
     clientSecret: TWITCH_CLIENT_SECRET,
     callbackURL: CALLBACK_URL,
     scope: "user:read:email",
-    forceVerify: true
+    customHeaders: {
+        "Client-ID": TWITCH_CLIENT_ID
+    }
 }, (accessToken, refreshToken, profile, done) => {
     return done(null, profile);
 }));
@@ -31,10 +35,13 @@ passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
 app.use(session({
-    secret: 'uma-secret-key',
+    secret: process.env.SESSION_SECRET || 'uma-secret-key',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }
+    cookie: { 
+        secure: !!process.env.RENDER_EXTERNAL_URL,
+        maxAge: 24 * 60 * 60 * 1000
+    }
 }));
 
 app.use(passport.initialize());
@@ -91,10 +98,6 @@ app.get('/login', (req, res) => {
                     color: #00ffcc; font-size: 2.5rem; letter-spacing: 15px;
                     margin: 0 0 10px 0; text-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
                 }
-                p {
-                    color: rgba(0, 255, 204, 0.5); margin-bottom: 40px;
-                    text-transform: uppercase; font-size: 0.8rem; letter-spacing: 4px;
-                }
                 .twitch-btn {
                     display: inline-flex; align-items: center;
                     background: transparent; border: 1px solid #00ffcc;
@@ -132,7 +135,13 @@ app.get('/login', (req, res) => {
 });
 
 app.get('/auth/twitch', passport.authenticate('twitch'));
-app.get('/auth/twitch/callback', passport.authenticate('twitch', { failureRedirect: '/login' }), (req, res) => res.redirect('/'));
+app.get('/auth/twitch/callback', 
+    passport.authenticate('twitch', { failureRedirect: '/login' }), 
+    (req, res) => {
+        res.redirect('/');
+    }
+);
+
 app.get('/logout', (req, res, next) => {
     req.logout((err) => {
         if (err) return next(err);
