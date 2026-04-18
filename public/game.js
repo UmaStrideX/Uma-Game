@@ -190,6 +190,7 @@ class SceneMain extends Phaser.Scene {
     }
 
     drawBubble(bubble, message) {
+        if (!bubble || !bubble.bg) return;
         const { bg, txt, container } = bubble;
         txt.setText(message);
         const p = 8, w = txt.width + p * 2, h = txt.height + p * 2;
@@ -235,17 +236,12 @@ class SceneMain extends Phaser.Scene {
             this.otherPlayers.clear(true, true);
 
             Object.keys(players).forEach((id) => { 
-                if (id !== this.socket.id) {
-                    this.addOtherPlayer(players[id]); 
-                }
+                if (id !== this.socket.id) this.addOtherPlayer(players[id]); 
             });
         });
 
         this.socket.on('newPlayer', (p) => {
-            const alreadyExists = this.otherPlayers.getChildren().find(op => op.playerId === p.id);
-            if (!alreadyExists) {
-                this.addOtherPlayer(p);
-            }
+            if (!this.otherPlayers.getChildren().find(op => op.playerId === p.id)) this.addOtherPlayer(p);
         });
 
         this.socket.on('playerMoved', (p) => {
@@ -262,10 +258,10 @@ class SceneMain extends Phaser.Scene {
 
         this.socket.on('playerDisconnected', (id) => {
             this.otherPlayers.getChildren().forEach((op) => {
-                if (id === op.playerId) {
-                    if (op.nameTag) op.nameTag.destroy();
+                if (id === op.playerId) { 
+                    if (op.nameTag) op.nameTag.destroy(); 
                     if (op.chatBubble && op.chatBubble.container) op.chatBubble.container.destroy();
-                    op.destroy();
+                    op.destroy(); 
                 }
             });
         });
@@ -277,7 +273,6 @@ class SceneMain extends Phaser.Scene {
             el.innerHTML = `<span class="chat-name">${d.name}:</span> ${d.text}`;
             disp.appendChild(el); 
             disp.scrollTop = disp.scrollHeight;
-
             let target = (d.id === this.socket.id) ? this.player : this.otherPlayers.getChildren().find(op => op.playerId === d.id);
             if (target) {
                 this.drawBubble(target.chatBubble, d.text);
@@ -302,8 +297,31 @@ class SceneMain extends Phaser.Scene {
     }
 
     setupChat() {
-        const input = document.getElementById('chat-input'), wrap = document.getElementById('chat-wrapper');
+        const input = document.getElementById('chat-input'), wrap = document.getElementById('chat-wrapper'), disp = document.getElementById('chat-display');
         wrap.style.display = 'flex';
+        
+        let isDragging = false, offsetX, offsetY;
+
+        disp.onmousedown = (e) => {
+            isDragging = true;
+            offsetX = e.clientX - wrap.offsetLeft;
+            offsetY = e.clientY - wrap.offsetTop;
+            disp.style.cursor = 'grabbing';
+        };
+
+        window.onmousemove = (e) => {
+            if (isDragging) {
+                wrap.style.left = (e.clientX - offsetX) + 'px';
+                wrap.style.top = (e.clientY - offsetY) + 'px';
+                wrap.style.bottom = 'auto';
+            }
+        };
+
+        window.onmouseup = () => {
+            isDragging = false;
+            disp.style.cursor = 'grab';
+        };
+
         input.addEventListener('keydown', (e) => {
             e.stopPropagation();
             if (e.key === 'Enter') {
