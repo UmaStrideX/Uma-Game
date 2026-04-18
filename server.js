@@ -15,7 +15,7 @@ const io = new Server(server, {
 
 const TWITCH_CLIENT_ID = '52swwi6jn9nth7ubkekb4mo7x8y6yr';
 const TWITCH_CLIENT_SECRET = 'zfpafa835uycupk5reye65ses6u7m1';
-const CALLBACK_URL = 'https://uma-game.onrender.com/auth/twitch/callback';
+const CALLBACK_URL = 'http://localhost:3000/auth/twitch/callback';
 
 passport.use(new TwitchStrategy({
     clientID: TWITCH_CLIENT_ID,
