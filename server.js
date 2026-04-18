@@ -131,8 +131,8 @@ io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
         Object.keys(players).forEach((id) => {
             if (players[id].nickname === data.nickname) {
-                delete players[id];
                 io.emit('playerDisconnected', id);
+                delete players[id];
             }
         });
 
@@ -144,6 +144,7 @@ io.on('connection', (socket) => {
             nickname: data.nickname,
             anim: `${data.char}_idle_down`
         };
+        
         socket.emit('currentPlayers', players);
         socket.broadcast.emit('newPlayer', players[socket.id]);
     });

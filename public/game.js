@@ -228,13 +228,24 @@ class SceneMain extends Phaser.Scene {
         });
 
         this.socket.on('currentPlayers', (players) => {
+            this.otherPlayers.getChildren().forEach((op) => {
+                if (op.nameTag) op.nameTag.destroy();
+                if (op.chatBubble && op.chatBubble.container) op.chatBubble.container.destroy();
+            });
+            this.otherPlayers.clear(true, true);
+
             Object.keys(players).forEach((id) => { 
-                if (id !== this.socket.id) this.addOtherPlayer(players[id]); 
+                if (id !== this.socket.id) {
+                    this.addOtherPlayer(players[id]); 
+                }
             });
         });
 
         this.socket.on('newPlayer', (p) => {
-            if (!this.otherPlayers.getChildren().find(op => op.playerId === p.id)) this.addOtherPlayer(p);
+            const alreadyExists = this.otherPlayers.getChildren().find(op => op.playerId === p.id);
+            if (!alreadyExists) {
+                this.addOtherPlayer(p);
+            }
         });
 
         this.socket.on('playerMoved', (p) => {
@@ -251,21 +262,31 @@ class SceneMain extends Phaser.Scene {
 
         this.socket.on('playerDisconnected', (id) => {
             this.otherPlayers.getChildren().forEach((op) => {
-                if (id === op.playerId) { op.nameTag.destroy(); op.chatBubble.container.destroy(); op.destroy(); }
+                if (id === op.playerId) {
+                    if (op.nameTag) op.nameTag.destroy();
+                    if (op.chatBubble && op.chatBubble.container) op.chatBubble.container.destroy();
+                    op.destroy();
+                }
             });
         });
 
         this.socket.on('newChatMessage', (d) => {
             const disp = document.getElementById('chat-display');
             const el = document.createElement('div'); 
-            el.innerHTML = `<span style="color:#00ffcc">${d.name}:</span> ${d.text}`;
+            el.className = 'chat-msg';
+            el.innerHTML = `<span class="chat-name">${d.name}:</span> ${d.text}`;
             disp.appendChild(el); 
             disp.scrollTop = disp.scrollHeight;
+
             let target = (d.id === this.socket.id) ? this.player : this.otherPlayers.getChildren().find(op => op.playerId === d.id);
             if (target) {
                 this.drawBubble(target.chatBubble, d.text);
                 if (target.bubbleTimer) target.bubbleTimer.remove();
-                target.bubbleTimer = this.time.delayedCall(5000, () => target.chatBubble.container.setVisible(false));
+                target.bubbleTimer = this.time.delayedCall(5000, () => {
+                    if (target.chatBubble && target.chatBubble.container) {
+                        target.chatBubble.container.setVisible(false);
+                    }
+                });
             }
         });
     }
