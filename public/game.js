@@ -13,50 +13,30 @@ class ScenePreload extends Phaser.Scene {
     preload() {
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
-
         const progressBar = this.add.graphics();
         const progressBox = this.add.graphics();
         progressBox.fillStyle(0x002222, 0.8);
         progressBox.fillRect(width / 2 - 160, height / 2 - 25, 320, 50);
 
         const loadingText = this.make.text({
-            x: width / 2,
-            y: height / 2 - 50,
-            text: 'CHARGEMENT...',
+            x: width / 2, y: height / 2 - 50, text: 'CHARGEMENT...',
             style: { font: '14px monospace', fill: '#00ffcc' }
         }).setOrigin(0.5, 0.5);
 
         const percentText = this.make.text({
-            x: width / 2,
-            y: height / 2,
-            text: '0%',
+            x: width / 2, y: height / 2, text: '0%',
             style: { font: '18px monospace', fill: '#ffffff' }
-        }).setOrigin(0.5, 0.5);
-
-        const assetText = this.make.text({
-            x: width / 2,
-            y: height / 2 + 50,
-            text: '',
-            style: { font: '12px monospace', fill: '#00ffcc' }
         }).setOrigin(0.5, 0.5);
 
         this.load.on('progress', (value) => {
             percentText.setText(parseInt(value * 100) + '%');
-            progressBar.clear();
-            progressBar.fillStyle(0x00ffcc, 1);
+            progressBar.clear().fillStyle(0x00ffcc, 1);
             progressBar.fillRect(width / 2 - 150, height / 2 - 15, 300 * value, 30);
         });
 
-        this.load.on('fileprogress', (file) => {
-            assetText.setText('Chargement : ' + file.key);
-        });
-
         this.load.on('complete', () => {
-            progressBar.destroy();
-            progressBox.destroy();
-            loadingText.destroy();
-            percentText.destroy();
-            assetText.destroy();
+            progressBar.destroy(); progressBox.destroy();
+            loadingText.destroy(); percentText.destroy();
         });
 
         UMA_LIST.forEach(name => {
@@ -85,6 +65,7 @@ class ScenePreload extends Phaser.Scene {
             this.parseCustomJson(name, 'idle', 16);
             this.parseCustomJson(name, 'run', 24);
         });
+
         this.scene.start('SceneMenu');
     }
 
@@ -112,12 +93,31 @@ class ScenePreload extends Phaser.Scene {
 
 class SceneMenu extends Phaser.Scene {
     constructor() { super({ key: 'SceneMenu' }); }
-    create() {
-        document.getElementById('ui-overlay').classList.add('visible');
+    
+    async create() {
+        let twitchName = "UMA-UNIT";
+        try {
+            const res = await fetch('/user-data');
+            const data = await res.json();
+            if (data.display_name) twitchName = data.display_name;
+        } catch (e) { console.error("Erreur auth:", e); }
+
+        const overlay = document.getElementById('ui-overlay');
+        overlay.classList.add('visible');
+        overlay.style.display = 'flex'; 
+
+        const nickInput = document.getElementById('nickname-input');
+        nickInput.value = twitchName;
+
+        document.getElementById('logout-btn-menu').onclick = () => {
+            window.location.href = '/logout';
+        };
+
         let currentIndex = 0;
         const nameDisplay = document.getElementById('uma-name');
         const previewSprite = this.add.sprite(this.scale.width / 2, this.scale.height / 2, `${UMA_LIST[currentIndex]}_idle_img`);
         previewSprite.setScale(1.4);
+
         const updateDisplay = () => {
             const name = UMA_LIST[currentIndex];
             nameDisplay.innerText = name.replace(/_/g, ' ');
@@ -132,11 +132,9 @@ class SceneMenu extends Phaser.Scene {
         document.getElementById('next-btn').onclick = () => { currentIndex = (currentIndex + 1) % UMA_LIST.length; updateDisplay(); };
         document.getElementById('prev-btn').onclick = () => { currentIndex = (currentIndex - 1 + UMA_LIST.length) % UMA_LIST.length; updateDisplay(); };
         document.getElementById('confirm-btn').onclick = () => {
-            const nick = document.getElementById('nickname-input').value || "UMA-UNIT";
-            document.getElementById('ui-overlay').classList.remove('visible');
-            document.getElementById('ui-overlay').classList.add('hidden');
+            overlay.classList.remove('visible'); overlay.style.display = 'none';
             previewSprite.destroy();
-            this.scene.start('SceneMain', { char: UMA_LIST[currentIndex], nickname: nick });
+            this.scene.start('SceneMain', { char: UMA_LIST[currentIndex], nickname: nickInput.value });
         };
     }
 }
@@ -151,11 +149,7 @@ class SceneMain extends Phaser.Scene {
         this.isPaused = false;
         this.otherPlayers = this.add.group();
         if (typeof io !== 'undefined') {
-            this.socket = io({
-                reconnection: true,
-                reconnectionAttempts: 5,
-                reconnectionDelay: 1000
-            });
+            this.socket = io({ reconnection: true });
         }
     }
     
@@ -209,12 +203,10 @@ class SceneMain extends Phaser.Scene {
         const resumeBtn = document.getElementById('resume-btn');
         const exitBtn = document.getElementById('exit-btn');
         this.input.keyboard.on('keydown-ESC', () => {
-            if (document.activeElement !== document.getElementById('chat-input')) {
-                this.toggleMenu();
-            }
+            if (document.activeElement !== document.getElementById('chat-input')) this.toggleMenu();
         });
         resumeBtn.onclick = () => this.toggleMenu();
-        exitBtn.onclick = () => window.location.reload();
+        exitBtn.onclick = () => window.location.href = '/logout';
     }
 
     toggleMenu() {
@@ -236,21 +228,13 @@ class SceneMain extends Phaser.Scene {
         });
 
         this.socket.on('currentPlayers', (players) => {
-            this.otherPlayers.getChildren().forEach(op => {
-                op.nameTag.destroy();
-                op.chatBubble.container.destroy();
-                op.destroy();
-            });
-            this.otherPlayers.clear(true, true);
-
             Object.keys(players).forEach((id) => { 
                 if (id !== this.socket.id) this.addOtherPlayer(players[id]); 
             });
         });
 
         this.socket.on('newPlayer', (p) => {
-            let existing = this.otherPlayers.getChildren().find(op => op.playerId === p.id);
-            if (!existing) this.addOtherPlayer(p);
+            if (!this.otherPlayers.getChildren().find(op => op.playerId === p.id)) this.addOtherPlayer(p);
         });
 
         this.socket.on('playerMoved', (p) => {
@@ -267,22 +251,16 @@ class SceneMain extends Phaser.Scene {
 
         this.socket.on('playerDisconnected', (id) => {
             this.otherPlayers.getChildren().forEach((op) => {
-                if (id === op.playerId) { 
-                    op.nameTag.destroy(); 
-                    op.chatBubble.container.destroy(); 
-                    op.destroy(); 
-                }
+                if (id === op.playerId) { op.nameTag.destroy(); op.chatBubble.container.destroy(); op.destroy(); }
             });
         });
 
         this.socket.on('newChatMessage', (d) => {
             const disp = document.getElementById('chat-display');
             const el = document.createElement('div'); 
-            el.className = 'chat-msg';
-            el.innerHTML = `<span class="chat-name">${d.name}:</span> ${d.text}`;
+            el.innerHTML = `<span style="color:#00ffcc">${d.name}:</span> ${d.text}`;
             disp.appendChild(el); 
             disp.scrollTop = disp.scrollHeight;
-
             let target = (d.id === this.socket.id) ? this.player : this.otherPlayers.getChildren().find(op => op.playerId === d.id);
             if (target) {
                 this.drawBubble(target.chatBubble, d.text);
@@ -294,8 +272,7 @@ class SceneMain extends Phaser.Scene {
 
     addOtherPlayer(p) {
         const op = this.add.sprite(p.x, p.y, `${p.char}_idle_img`);
-        op.playerId = p.id;
-        op.setOrigin(0.5, 1);
+        op.playerId = p.id; op.setOrigin(0.5, 1);
         op.nameTag = this.add.text(p.x, p.y - 15, p.nickname, {
             fontSize: '18px', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.6)', padding: { x: 6, y: 3 }
         }).setOrigin(0.5, 0).setDepth(20000);
@@ -304,30 +281,8 @@ class SceneMain extends Phaser.Scene {
     }
 
     setupChat() {
-        const input = document.getElementById('chat-input'), 
-              disp = document.getElementById('chat-display'), 
-              wrap = document.getElementById('chat-wrapper');
-
+        const input = document.getElementById('chat-input'), wrap = document.getElementById('chat-wrapper');
         wrap.style.display = 'flex';
-        let isDragging = false, offset = { x: 0, y: 0 };
-
-        disp.onmousedown = (e) => {
-            const rect = wrap.getBoundingClientRect();
-            if (e.clientX < rect.right - 20 && e.clientY < rect.bottom - 20) {
-                isDragging = true;
-                offset.x = e.clientX - wrap.offsetLeft;
-                offset.y = e.clientY - wrap.offsetTop;
-            }
-        };
-        document.onmousemove = (e) => {
-            if (isDragging) {
-                wrap.style.left = (e.clientX - offset.x) + 'px';
-                wrap.style.top = (e.clientY - offset.y) + 'px';
-                wrap.style.bottom = 'auto';
-            }
-        };
-        document.onmouseup = () => isDragging = false;
-
         input.addEventListener('keydown', (e) => {
             e.stopPropagation();
             if (e.key === 'Enter') {
@@ -336,43 +291,14 @@ class SceneMain extends Phaser.Scene {
                 input.value = ""; input.blur();
                 this.input.keyboard.enabled = true;
             }
-            if (e.key === 'Escape') {
-                input.value = ""; input.blur();
-                this.input.keyboard.enabled = true;
-            }
         });
-
         this.input.keyboard.on('keydown-ENTER', () => { 
-            if (document.activeElement !== input && !this.isPaused) { 
-                input.focus(); 
-                this.input.keyboard.enabled = false; 
-            } 
-        });
-
-        this.socket.on('newChatMessage', (d) => {
-            const el = document.createElement('div'); el.className = 'chat-msg';
-            el.innerHTML = `<span class="chat-name">${d.name}:</span> ${d.text}`;
-            disp.appendChild(el); disp.scrollTop = disp.scrollHeight;
-            let target = (d.id === this.socket.id) ? this.player : this.otherPlayers.getChildren().find(op => op.playerId === d.id);
-            if (target) {
-                this.drawBubble(target.chatBubble, d.text);
-                if (target.bubbleTimer) target.bubbleTimer.remove();
-                target.bubbleTimer = this.time.delayedCall(5000, () => target.chatBubble.container.setVisible(false));
-            }
+            if (document.activeElement !== input && !this.isPaused) { input.focus(); this.input.keyboard.enabled = false; } 
         });
     }
 
     update() {
-        if (this.isPaused) return;
-        if (!this.input.keyboard.enabled) { 
-            if (this.player.body.velocity.x !== 0 || this.player.body.velocity.y !== 0) {
-                this.player.setVelocity(0);
-                this.player.play(`${this.charName}_idle_${this.currentDir}`, true);
-                if (this.socket) this.socket.emit('playerMovement', { x: this.player.x, y: this.player.y, anim: `${this.charName}_idle_${this.currentDir}` });
-            }
-            return; 
-        }
-
+        if (this.isPaused || !this.input.keyboard.enabled) return;
         const speed = 350;
         let ix = 0, iy = 0;
         if (this.cursors.left.isDown) ix = -1; else if (this.cursors.right.isDown) ix = 1;
@@ -402,14 +328,8 @@ class SceneMain extends Phaser.Scene {
 const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
-    scale: {
-        mode: Phaser.Scale.RESIZE,
-        parent: 'game-container',
-        width: '100%',
-        height: '100%'
-    },
-    antialias: true,
+    scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
     physics: { default: 'arcade' },
     scene: [ScenePreload, SceneMenu, SceneMain]
 };
-const game = new Phaser.Game(config);
+new Phaser.Game(config);
