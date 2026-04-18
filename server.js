@@ -5,7 +5,10 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    pingTimeout: 30000,
+    pingInterval: 10000
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -22,7 +25,8 @@ io.on('connection', (socket) => {
             x: 0,
             y: 0,
             char: data.char,
-            nickname: data.nickname
+            nickname: data.nickname,
+            anim: `${data.char}_idle_down`
         };
         socket.emit('currentPlayers', players);
         socket.broadcast.emit('newPlayer', players[socket.id]);
@@ -48,12 +52,14 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
+        if (players[socket.id]) {
+            delete players[socket.id];
+            io.emit('playerDisconnected', socket.id);
+        }
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Serveur actif sur le port ${PORT}`);
+    console.log(`Serveur lancé sur le port ${PORT}`);
 });

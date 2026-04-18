@@ -124,6 +124,11 @@ class SceneMenu extends Phaser.Scene {
             previewSprite.play(`${name}_idle_down`);
         };
         updateDisplay();
+
+        this.scale.on('resize', (gameSize) => {
+            previewSprite.setPosition(gameSize.width / 2, gameSize.height / 2);
+        });
+
         document.getElementById('next-btn').onclick = () => { currentIndex = (currentIndex + 1) % UMA_LIST.length; updateDisplay(); };
         document.getElementById('prev-btn').onclick = () => { currentIndex = (currentIndex - 1 + UMA_LIST.length) % UMA_LIST.length; updateDisplay(); };
         document.getElementById('confirm-btn').onclick = () => {
@@ -138,13 +143,20 @@ class SceneMenu extends Phaser.Scene {
 
 class SceneMain extends Phaser.Scene {
     constructor() { super({ key: 'SceneMain' }); }
+    
     init(data) { 
         this.charName = data.char; 
         this.nickname = data.nickname;
         this.currentDir = 'down'; 
         this.isPaused = false;
         this.otherPlayers = this.add.group();
-        if (typeof io !== 'undefined') this.socket = io();
+        if (typeof io !== 'undefined') {
+            this.socket = io({
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000
+            });
+        }
     }
     
     create() {
@@ -219,11 +231,28 @@ class SceneMain extends Phaser.Scene {
     }
 
     setupSocket() {
-        this.socket.emit('joinGame', { char: this.charName, nickname: this.nickname });
-        this.socket.on('currentPlayers', (players) => {
-            Object.keys(players).forEach((id) => { if (id !== this.socket.id) this.addOtherPlayer(players[id]); });
+        this.socket.on('connect', () => {
+            this.socket.emit('joinGame', { char: this.charName, nickname: this.nickname });
         });
-        this.socket.on('newPlayer', (p) => this.addOtherPlayer(p));
+
+        this.socket.on('currentPlayers', (players) => {
+            this.otherPlayers.getChildren().forEach(op => {
+                op.nameTag.destroy();
+                op.chatBubble.container.destroy();
+                op.destroy();
+            });
+            this.otherPlayers.clear(true, true);
+
+            Object.keys(players).forEach((id) => { 
+                if (id !== this.socket.id) this.addOtherPlayer(players[id]); 
+            });
+        });
+
+        this.socket.on('newPlayer', (p) => {
+            let existing = this.otherPlayers.getChildren().find(op => op.playerId === p.id);
+            if (!existing) this.addOtherPlayer(p);
+        });
+
         this.socket.on('playerMoved', (p) => {
             this.otherPlayers.getChildren().forEach((op) => {
                 if (p.id === op.playerId) {
@@ -235,10 +264,31 @@ class SceneMain extends Phaser.Scene {
                 }
             });
         });
+
         this.socket.on('playerDisconnected', (id) => {
             this.otherPlayers.getChildren().forEach((op) => {
-                if (id === op.playerId) { op.nameTag.destroy(); op.chatBubble.container.destroy(); op.destroy(); }
+                if (id === op.playerId) { 
+                    op.nameTag.destroy(); 
+                    op.chatBubble.container.destroy(); 
+                    op.destroy(); 
+                }
             });
+        });
+
+        this.socket.on('newChatMessage', (d) => {
+            const disp = document.getElementById('chat-display');
+            const el = document.createElement('div'); 
+            el.className = 'chat-msg';
+            el.innerHTML = `<span class="chat-name">${d.name}:</span> ${d.text}`;
+            disp.appendChild(el); 
+            disp.scrollTop = disp.scrollHeight;
+
+            let target = (d.id === this.socket.id) ? this.player : this.otherPlayers.getChildren().find(op => op.playerId === d.id);
+            if (target) {
+                this.drawBubble(target.chatBubble, d.text);
+                if (target.bubbleTimer) target.bubbleTimer.remove();
+                target.bubbleTimer = this.time.delayedCall(5000, () => target.chatBubble.container.setVisible(false));
+            }
         });
     }
 
@@ -352,11 +402,14 @@ class SceneMain extends Phaser.Scene {
 const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
-    width: window.innerWidth,
-    height: window.innerHeight,
+    scale: {
+        mode: Phaser.Scale.RESIZE,
+        parent: 'game-container',
+        width: '100%',
+        height: '100%'
+    },
     antialias: true,
     physics: { default: 'arcade' },
     scene: [ScenePreload, SceneMenu, SceneMain]
 };
 const game = new Phaser.Game(config);
-window.addEventListener('resize', () => game.scale.resize(window.innerWidth, window.innerHeight));
